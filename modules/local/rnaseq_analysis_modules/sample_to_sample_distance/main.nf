@@ -11,6 +11,25 @@ process SAMPLE_TO_SAMPLE_DISTANCE {
     path(sample_key)
 
     output:
-    
+    path 'sample_to_sample_distance.pdf' , emit: sample_dist_pdf
+    path "versions.yml" , emit: versions
+
+    script:
+    def args = task.ext.args ?: ''
+    def out_file = "sample_to_sample_distance.pdf"
+    """
+    Rscript /rnaseq_analysis_modules/sample_to_sample_distance.R \
+    --vsd ${vst} \
+    --sample_key ${sample_key} \
+    --annotate_samples \
+    --out_file ${out_file} \
+    ${args}
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        r-base: \$(echo \$(R --version 2>&1) | sed 's/^.*R version //; s/ .*\$//')
+        rnaseq_analysis_modules: \$(echo /rnaseq_analysis_modules/VERSION.txt)
+    END_VERSIONS
+    """
 
 }
