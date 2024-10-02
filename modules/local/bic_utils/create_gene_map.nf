@@ -16,18 +16,23 @@ process CREATE_GENE_MAP {
 
     script:
     """
-    #!/bin/bash
 
     # Extract the column indices for the headers
-    col1=$(head -1 "${merged_counts}" | tr ',' '\n' | nl -v 0 | grep -w "GeneID" | awk '{print $1}')
-    col2=$(head -1 "${merged_counts}" | tr ',' '\n' | nl -v 0 | grep -w "GeneSymbol" | awk '{print $1}')
+    col1=\$(head -1 "${merged_counts}" | tr ',' '\n' | nl -v 0 | grep -w "GeneID" | awk '{print \$1}')
+    col2=\$(head -1 "${merged_counts}" | tr ',' '\n' | nl -v 0 | grep -w "GeneSymbol" | awk '{print \$1}')
+
+    # Check if columns were found
+    if [[ -z "\$col1" || -z "\$col2" ]]; then
+        echo "Error: Required headers 'GeneID' or 'GeneSymbol' not found in the input file." >&2
+        exit 1
+    fi
 
     # Extract the sample key
-    cut -d, -f$col1,$col2 "${merged_counts}" > gene_map.tsv
+    cut -d, -f\$col1,\$col2 "${merged_counts}" > gene_map.tsv
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        bash: \$(echo \$(bash --version | grep -Eo 'version [[:alnum:].]+' | sed 's/version //'))
+        bash: \$(bash --version | head -n 1 | awk '{print \$4}')
     END_VERSIONS
     """
 }

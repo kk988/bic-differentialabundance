@@ -12,6 +12,7 @@ include { HEATMAP } from '../../../modules/local/rnaseq_analysis_modules/heatmap
 include { SAMPLE_TO_SAMPLE_DISTANCE } from '../../../modules/local/rnaseq_analysis_modules/sample_to_sample_distance/main'
 include { PC_LOAD } from '../../../modules/local/rnaseq_analysis_modules/pc_load/main'
 include { CREATE_SAMPLE_KEY } from '../../../modules/local/bic_utils/create_sample_key'
+include { CREATE_GENE_MAP } from '../../../modules/local/bic_utils/create_gene_map'
 
 take:
 ch_input // channel [meta, input.csv]  used in creating sample key
@@ -35,6 +36,8 @@ ch_gene_map = CREATE_GENE_MAP.out.gene_map
 // Sample to sample distance
 SAMPLE_TO_SAMPLE_DISTANCE(ch_vst, ch_sample_key)
 
-
 // DE heatmaps
+// HEATMAP(ch_vst, ch_sample_key, ch_gene_map)
+
 // PC loadings
+// PC_LOAD(ch_vst, ch_sample_key, ch_gene_map)
