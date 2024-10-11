@@ -18,8 +18,8 @@ process CREATE_GENE_MAP {
     """
 
     # Extract the column indices for the headers
-    col1=\$(head -1 "${merged_counts}" | tr ',' '\n' | nl -v 0 | grep -w "GeneID" | awk '{print \$1}')
-    col2=\$(head -1 "${merged_counts}" | tr ',' '\n' | nl -v 0 | grep -w "GeneSymbol" | awk '{print \$1}')
+    col1=\$(head -1 "${merged_counts}" | tr '\\t' '\\n' | nl | grep -w "GeneID" | head -n 1 | awk '{print \$1}')
+    col2=\$(head -1 "${merged_counts}" | tr '\\t' '\\n' | nl | grep -w "GeneSymbol" | awk '{print \$1}')
 
     # Check if columns were found
     if [[ -z "\$col1" || -z "\$col2" ]]; then
@@ -28,7 +28,7 @@ process CREATE_GENE_MAP {
     fi
 
     # Extract the sample key
-    cut -d, -f\$col1,\$col2 "${merged_counts}" > gene_map.tsv
+    cut -f\$col1,\$col2 "${merged_counts}" > gene_map.tsv
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

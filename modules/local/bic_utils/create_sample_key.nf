@@ -18,8 +18,8 @@ process CREATE_SAMPLE_KEY {
     """
 
     # Extract the column indices for the headers
-    col1=\$(head -1 "${input_file}" | tr ',' '\n' | nl -v 0 | grep -w "sample" | awk '{print \$1}')
-    col2=\$(head -1 "${input_file}" | tr ',' '\n' | nl -v 0 | grep -w "condition" | awk '{print \$1}')
+    col1=\$(head -1 "${input_file}" | tr ',' '\\n' | nl | grep -w "sample" | awk '{print \$1}')
+    col2=\$(head -1 "${input_file}" | tr ',' '\\n' | nl | grep -w "condition" | awk '{print \$1}')
 
     # Check if columns were found
     if [[ -z "\$col1" || -z "\$col2" ]]; then
@@ -28,7 +28,7 @@ process CREATE_SAMPLE_KEY {
     fi
 
     # Extract the sample key
-    cut -d, -f\$col1,\$col2 "${input_file}" > sample_key.tsv
+    cut -d, -f\$col1,\$col2 <(tail -n +2 "${input_file}")  | tr ',' '\\t' | sort | uniq > sample_key.tsv
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

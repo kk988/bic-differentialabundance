@@ -131,6 +131,7 @@ include { PROTEUS_READPROTEINGROUPS as PROTEUS              } from '../modules/n
 include { GEOQUERY_GETGEO                                   } from '../modules/nf-core/geoquery/getgeo/main'
 include { ZIP as MAKE_REPORT_BUNDLE                         } from '../modules/nf-core/zip/main'
 include { softwareVersionsToYAML                            } from '../subworkflows/nf-core/utils_nfcore_pipeline'
+include { BIC_PLOTS                                         } from '../subworkflows/local/bic_plots'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -527,6 +528,15 @@ workflow DIFFERENTIALABUNDANCE {
     PLOT_DIFFERENTIAL(
         ch_differential,
         ch_all_matrices
+    )
+
+    ch_vst = DESEQ2_NORM.out.vst_counts
+    BIC_PLOTS(
+        ch_input,       // channel [meta, input.csv]
+        ch_in_raw,      // channel [meta, counts]
+        ch_vst,         // channel [meta, vst]
+        ch_norm,         // channel [meta, normalized counts]
+        ch_differential // channel [meta, diff results]
     )
 
     // Gather software versions

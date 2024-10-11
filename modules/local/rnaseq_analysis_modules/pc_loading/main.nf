@@ -1,4 +1,4 @@
-process SAMPLE_TO_SAMPLE_DISTANCE {
+process PC_LOADING {
     tag "$meta.id"
     label 'process_single'
 
@@ -9,20 +9,21 @@ process SAMPLE_TO_SAMPLE_DISTANCE {
     input:
     tuple val(meta), path(vst)
     path(sample_key)
+    path(gene_map)
 
     output:
-    path 'sample_to_sample_distance.pdf' , emit: sample_dist_pdf
+    path '*.pdf' , emit: plot
     path "versions.yml" , emit: versions
 
     script:
     def args = task.ext.args ?: ''
-    def out_file = "sample_to_sample_distance.pdf"
+    def out_file = "pc_loading.pdf"
     """
-    Rscript /rnaseq_analysis_modules/make_samp_distances.R \
+    Rscript /rnaseq_analysis_modules/make_pca_loading_plot.R \
     --vsd ${vst} \
     --key_file ${sample_key} \
-    --annotate_samples \
     --out_file ${out_file} \
+    --gene_map ${gene_map} \
     ${args}
 
     rm Rplots.pdf
