@@ -1,6 +1,6 @@
 process GSEA_GSEA {
     tag "$meta.id"
-    label 'process_single'
+    label 'process_low'
 
     conda "${moduleDir}/environment.yml"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
@@ -52,10 +52,13 @@ process GSEA_GSEA {
     """
     # Run GSEA
 
+    export HOME=$PWD
+    export JVM_MEM_OPTS="-Xmx6g"
+
     gsea-cli GSEA \\
         -res $gct \\
         -cls ${cls}#${target}_versus_${reference} \\
-        -gmx $gene_sets \\
+        -gmx_list $gene_sets \\
         $chip_command \\
         -out . \\
         --rpt_label $rpt_label \\

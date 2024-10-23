@@ -69,6 +69,16 @@ workflow {
     //
     NFCORE_DIFFERENTIALABUNDANCE ()
 
+
+    PIPELINE_COMPLETION(
+        params.email,
+        params.email_on_fail,
+        params.plaintext_email,
+        params.outdir,
+        params.monochrome_logs,
+        params.hook_url,
+        null
+    )
 }
 
 /*
