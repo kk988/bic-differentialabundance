@@ -438,6 +438,9 @@ workflow DIFFERENTIALABUNDANCE {
             [params.features_id_col, params.features_name_col]
         )
 
+        // If any group has < 3 samples, run GSEA_GSEA_PRERANKED instead of GSEA_GSEA
+        
+
         // The normalised matrix does not always have a contrast meta, so we
         // need a combine rather than a join here
         // Also add file name to metamap for easy access from modules.config
@@ -510,7 +513,7 @@ workflow DIFFERENTIALABUNDANCE {
         ch_mat = ch_raw.combine(ch_processed_matrices)
     }
 
-    ch_all_matrices = VALIDATOR.out.sample_meta                // meta, samples
+    ch_all_matrices = VALIDATOR.out.sample_meta                 // meta, samples
         .join(VALIDATOR.out.feature_meta)                       // meta, samples, features
         .join(ch_mat)                                           // meta, samples, features, raw, norm (or just norm)
         .map{
@@ -535,7 +538,7 @@ workflow DIFFERENTIALABUNDANCE {
         ch_input,       // channel [meta, input.csv]
         ch_in_raw,      // channel [meta, counts]
         ch_vst,         // channel [meta, vst]
-        ch_norm,         // channel [meta, normalized counts]
+        ch_norm,        // channel [meta, normalized counts]
         ch_differential // channel [meta, diff results]
     )
 
@@ -545,6 +548,7 @@ workflow DIFFERENTIALABUNDANCE {
         .mix(VALIDATOR.out.versions)
         .mix(PLOT_EXPLORATORY.out.versions)
         .mix(PLOT_DIFFERENTIAL.out.versions)
+        .mix(BIC_PLOTS.out.versions)
 
     //
     // Collate and save software versions

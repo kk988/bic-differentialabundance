@@ -4,7 +4,7 @@ suppressPackageStartupMessages(library(openxlsx))
 suppressPackageStartupMessages(library(tidyverse))
 
 # de results header:
-# gene_id	baseMean	log2FoldChange	lfcSE	pvalue	padj
+# GeneID	baseMean	log2FoldChange	lfcSE	pvalue	padj
 
 # gene list header:
 # GeneID    GeneSymbol
@@ -19,7 +19,7 @@ gene_file <- args[3]
 gene_list <- de_res %>% 
             filter(padj < 0.05) %>%
             slice_max(abs(log2FoldChange), n = 50, with_ties = FALSE) %>%
-            pull(gene_id)
+            pull(GeneID)
 
 # change to gene Symbols
 genes <- gene_map %>% filter( GeneID %in% gene_list ) %>% pull(GeneSymbol)

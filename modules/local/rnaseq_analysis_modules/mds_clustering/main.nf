@@ -1,4 +1,4 @@
-process PC_LOADING {
+process MDS_CLUSTERING {
     tag "$meta.id"
     label 'process_single'
 
@@ -7,26 +7,26 @@ process PC_LOADING {
         '/juno/bic/depot/singularity/bic_rnaseq_modules/tag/2.0.2/bic_rnaseq_modules_2.0.2.simg' }"
 
     input:
-    tuple val(meta), path(vst)
-    path(sample_key)
-    path(gene_map)
+    tuple val(meta), path(norm)         // normalized counts
+    path(sample_key)                    // sample key
+
 
     output:
-    path '*/png/pc_loading.png' , emit: plot
+    path '*/png/plot_MDS.png' , emit: plot
     path "versions.yml" , emit: versions
 
     script:
     def args = task.ext.args ?: ''
-    def out_file = "${meta.variable}/png/pc_loading.png"
+    def out_prefix = "${meta.variable}/png/plot"
 
     """
-    mkdir -p \$(dirname ${out_file})
+    mkdir -p \$(dirname ${out_prefix})
 
-    Rscript /rnaseq_analysis_modules/make_pca_loading_plot.R \
-    --vsd ${vst} \
+    Rscript /rnaseq_analysis_modules/sample_clustering.R \
+    --norm_counts ${norm} \
     --key_file ${sample_key} \
-    --out_file ${out_file} \
-    --gene_map ${gene_map} \
+    --out_prefix ${out_prefix} \
+    --method MDS \
     --file_type png \
     ${args}
 

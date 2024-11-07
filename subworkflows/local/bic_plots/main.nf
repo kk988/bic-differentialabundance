@@ -13,6 +13,7 @@ include { SAMPLE_TO_SAMPLE_DISTANCE } from '../../../modules/local/rnaseq_analys
 include { PC_LOADING } from '../../../modules/local/rnaseq_analysis_modules/pc_loading/main'
 include { CREATE_SAMPLE_KEY } from '../../../modules/local/bic_utils/create_sample_key'
 include { CREATE_GENE_MAP } from '../../../modules/local/bic_utils/create_gene_map'
+include { MDS_CLUSTERING } from '../../../modules/local/rnaseq_analysis_modules/mds_clustering'
 
 workflow BIC_PLOTS {
 
@@ -47,6 +48,10 @@ workflow BIC_PLOTS {
     //PC loadings
     PC_LOADING(ch_vst, ch_sample_key, ch_gene_map)
     ch_versions = ch_versions.mix(HEATMAP.out.versions)
+
+    //MDS clustering
+    MDS_CLUSTERING(ch_norm, ch_sample_key)
+    ch_versions = ch_versions.mix(MDS_CLUSTERING.out.versions)
 
     emit:
     versions    = ch_versions

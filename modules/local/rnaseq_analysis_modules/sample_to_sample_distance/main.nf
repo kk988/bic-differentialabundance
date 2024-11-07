@@ -3,29 +3,30 @@ process SAMPLE_TO_SAMPLE_DISTANCE {
     label 'process_single'
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        '/juno/bic/work/kristakaz/nf-diff/singularity_cache/bic_rnaseq_modules_2.0.2.simg' :
-        '/juno/bic/work/kristakaz/nf-diff/singularity_cache/bic_rnaseq_modules_2.0.2.simg' }"
+        '/juno/bic/depot/singularity/bic_rnaseq_modules/tag/2.0.2/bic_rnaseq_modules_2.0.2.simg' :
+        '/juno/bic/depot/singularity/bic_rnaseq_modules/tag/2.0.2/bic_rnaseq_modules_2.0.2.simg' }"
 
     input:
     tuple val(meta), path(vst)
     path(sample_key)
 
     output:
-    path 'sample_to_sample_distance.pdf' , emit: sample_dist_pdf
+    path '*/png/sample_to_sample_distance.png' , emit: sample_dist
     path "versions.yml" , emit: versions
 
-    script:
+    script:    
     def args = task.ext.args ?: ''
-    def out_file = "sample_to_sample_distance.pdf"
+    def out_file = "${meta.variable}/png/sample_to_sample_distance.png"
     """
+    mkdir -p \$(dirname ${out_file})
+
     Rscript /rnaseq_analysis_modules/make_samp_distances.R \
     --vsd ${vst} \
     --key_file ${sample_key} \
     --annotate_samples \
     --out_file ${out_file} \
+    --file_type png \
     ${args}
-
-    rm Rplots.pdf
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
