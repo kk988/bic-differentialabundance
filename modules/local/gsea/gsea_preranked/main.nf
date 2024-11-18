@@ -8,25 +8,21 @@ process GSEA_GSEA_PRERANKED {
         'biocontainers/gsea:4.3.2--hdfd78af_0' }"
 
     input:
-    tuple val(meta), path(gene_sets)
-    tuple val(meta2), path(differential)
-    path(chip) // Optional identifier mapping file
+    tuple val(meta), path(differential)
+    path(gene_sets)
+    path(chip)
 
     output:
     tuple val(meta), path("*.rpt")                                   , emit: rpt
     tuple val(meta), path("*index.html")                             , emit: index_html
-    tuple val(meta), path("*heat_map_corr_plot.html")                , emit: heat_map_corr_plot
-    tuple val(meta), path("*gsea_report_for_${meta2.reference}.tsv") , emit: report_tsvs_ref
-    tuple val(meta), path("*gsea_report_for_${meta2.reference}.html"), emit: report_htmls_ref
-    tuple val(meta), path("*gsea_report_for_${meta2.target}.tsv")    , emit: report_tsvs_target
-    tuple val(meta), path("*gsea_report_for_${meta2.target}.html")   , emit: report_htmls_target
+    tuple val(meta), path("*gsea_report_for_na_neg.tsv")  , emit: report_tsvs_ref
+    tuple val(meta), path("*gsea_report_for_na_neg.html") , emit: report_htmls_ref
+    tuple val(meta), path("*gsea_report_for_na_pos.tsv")     , emit: report_tsvs_target
+    tuple val(meta), path("*gsea_report_for_na_pos.html")    , emit: report_htmls_target
     tuple val(meta), path("*ranked_gene_list*.tsv")                  , emit: ranked_gene_list
     tuple val(meta), path("*gene_set_sizes.tsv")                     , emit: gene_set_sizes
     tuple val(meta), path("*global_es_histogram.png")                , emit: histogram
-    tuple val(meta), path("*heat_map_1.png")                         , emit: heatmap
     tuple val(meta), path("*pvalues_vs_nes_plot.png")                , emit: pvalues_vs_nes_plot
-    tuple val(meta), path("*ranked_list_corr_2.png")                 , emit: ranked_list_corr
-    tuple val(meta), path("*butterfly_plot.png")                     , emit: butterfly_plot, optional: true
     tuple val(meta), path("*[!gene_set_size|gsea_report|ranked_gene_list]*.tsv"), emit: gene_set_tsv, optional: true
     tuple val(meta), path("*[!gsea_report|heat_map_corr_plot|index|pos_snapshot|neg_snapshot]*.html"), emit: gene_set_html, optional: true
     tuple val(meta), path("*[!butterfly|enplot|global_es_histogram|gset_rnd_es_dist|heat_map|pvalues_vs_nes_plot|ranked_list_corr]*.png"), emit: gene_set_heatmap, optional: true
@@ -48,7 +44,7 @@ process GSEA_GSEA_PRERANKED {
     // GSEA doesn't produce double-dotted top-level outputs
     def rpt_label = prefix.replaceAll('\\.$', '')
 
-    def chip_command = chip ? "-chip $chip -collapse true" : ''
+    def chip_command = chip ? "-chip $chip -collapse Collapse" : ''
     """
     # make rnk file
     # Extract the column indices for the headers
@@ -62,7 +58,7 @@ process GSEA_GSEA_PRERANKED {
     fi
 
     # Extract the sample key
-    cut -f\$col1,\$col2 "${merged_counts}" | tail -n+2 > ranking.rnk
+    cut -f\$col1,\$col2 "${differential}" | tail -n+2 | grep -v ^__ > ranking.rnk
 
     # Run GSEA
 
@@ -74,11 +70,11 @@ process GSEA_GSEA_PRERANKED {
         -gmx_list $gene_sets \\
         $chip_command \\
         -out . \\
-        --rpt_label $rpt_label \\
+        -rpt_label $rpt_label \\
         $args
 
     # Un-timestamp the outputs for path consistency
-    mv ${rpt_label}.Gsea.*/* .
+    mv ${rpt_label}.GseaPreranked.*/* .
     timestamp=\$(cat *.rpt | grep producer_timestamp | awk '{print \$2}')
 
     for pattern in _\${timestamp} .\${timestamp}; do

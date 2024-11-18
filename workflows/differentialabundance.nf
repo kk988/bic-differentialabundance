@@ -130,6 +130,8 @@ include { AFFY_JUSTRMA as AFFY_JUSTRMA_NORM                 } from '../modules/n
 include { PROTEUS_READPROTEINGROUPS as PROTEUS              } from '../modules/nf-core/proteus/readproteingroups/main'
 include { GEOQUERY_GETGEO                                   } from '../modules/nf-core/geoquery/getgeo/main'
 include { ZIP as MAKE_REPORT_BUNDLE                         } from '../modules/nf-core/zip/main'
+include { GSEA_GSEA_PRERANKED                               } from '../modules/local/gsea/gsea_preranked'
+include { getFullConditionList                              } from '../modules/local/bic_utils/general'
 include { softwareVersionsToYAML                            } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { BIC_PLOTS                                         } from '../subworkflows/local/bic_plots'
 
@@ -438,37 +440,69 @@ workflow DIFFERENTIALABUNDANCE {
             [params.features_id_col, params.features_name_col]
         )
 
-        // If any group has < 3 samples, run GSEA_GSEA_PRERANKED instead of GSEA_GSEA
-        
-
-        // The normalised matrix does not always have a contrast meta, so we
-        // need a combine rather than a join here
-        // Also add file name to metamap for easy access from modules.config
-
-        ch_gsea_inputs = CUSTOM_TABULARTOGSEAGCT.out.gct
-            .map{ it.tail() }
-            .combine(CUSTOM_TABULARTOGSEACLS.out.cls)
-            .map{ tuple(it[1], it[0], it[2]) }
-            .combine(ch_gene_sets)
-
-        GSEA_GSEA(
-            ch_gsea_inputs,
-            ch_gsea_inputs.map{ tuple(it[0].reference, it[0].target) }, // *
-            TABULAR_TO_GSEA_CHIP.out.chip.first()
-        )
-
-        // * Note: GSEA module currently uses a value channel for the mandatory
-        // non-file arguments used to define contrasts, hence the indicated
-        // usage of map to perform that transformation. An active subject of
-        // debate
-
-        ch_gsea_results = GSEA_GSEA.out.report_tsvs_ref
-            .join(GSEA_GSEA.out.report_tsvs_target)
-
-        // Record GSEA versions
         ch_versions = ch_versions
             .mix(TABULAR_TO_GSEA_CHIP.out.versions)
-            .mix(GSEA_GSEA.out.versions)
+
+        // If any group has < 3 samples, run GSEA_GSEA_PRERANKED instead of GSEA_GSEA
+        // Check that the conditions have at least 3 samples
+        def run_prerank = false
+        def cond_list = getFullConditionList()
+
+        // Get unique conditions
+        def unique_cond = cond_list.unique(false)
+
+        // Iterate over the unique conditions and check sample sizes
+        for (cndtn in unique_cond) {
+            if (cond_list.findAll { it == cndtn }.size() < 3) {
+                log.warn "Condition ${cndtn} has less than 3 samples. Prerank will run for ALL comparisons."
+                run_prerank = true
+            }
+        }
+
+        if(run_prerank) {
+            GSEA_GSEA_PRERANKED(
+                ch_differential, 
+                ch_gene_sets.first(),
+                TABULAR_TO_GSEA_CHIP.out.chip.first())
+
+            ch_gsea_results = GSEA_GSEA_PRERANKED.out.report_tsvs_ref
+                .join(GSEA_GSEA_PRERANKED.out.report_tsvs_target)
+
+            // Record GSEA versions
+            ch_versions = ch_versions
+                .mix(GSEA_GSEA_PRERANKED.out.versions)
+        } else {
+
+            // The normalised matrix does not always have a contrast meta, so we
+            // need a combine rather than a join here
+            // Also add file name to metamap for easy access from modules.config
+
+            ch_gsea_inputs = CUSTOM_TABULARTOGSEAGCT.out.gct
+                .map{ it.tail() }
+                .combine(CUSTOM_TABULARTOGSEACLS.out.cls)
+                .map{ tuple(it[1], it[0], it[2]) }
+                .combine(ch_gene_sets)
+
+            GSEA_GSEA(
+                ch_gsea_inputs,
+                ch_gsea_inputs.map{ tuple(it[0].reference, it[0].target) }, // *
+                TABULAR_TO_GSEA_CHIP.out.chip.first()
+            )
+
+
+            // * Note: GSEA module currently uses a value channel for the mandatory
+            // non-file arguments used to define contrasts, hence the indicated
+            // usage of map to perform that transformation. An active subject of
+            // debate
+
+            ch_gsea_results = GSEA_GSEA.out.report_tsvs_ref
+                .join(GSEA_GSEA.out.report_tsvs_target)
+
+            // Record GSEA versions
+            ch_versions = ch_versions
+                .mix(GSEA_GSEA.out.versions)
+
+        }
     }
 
     if (params.gprofiler2_run) {

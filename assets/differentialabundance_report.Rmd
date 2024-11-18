@@ -920,6 +920,13 @@ if (any(unlist(params[paste0(possible_gene_set_methods, '_run')]))){
 
             reference_gsea_tables <- paste0(contrasts$id, ".", gmt_name, '.gsea_report_for_', contrasts$reference, '.tsv')
             target_gsea_tables <- paste0(contrasts$id, ".", gmt_name, '.gsea_report_for_', contrasts$target, '.tsv')
+
+            # if these files are not present, try changing the names to na_pos and na_neg
+            if ( ! all(file.exists(reference_gsea_tables)) && ! all(file.exists(target_gsea_tables))) {
+                reference_gsea_tables <- paste0(contrasts$id, ".", gmt_name, '.gsea_report_for_na_neg.tsv')
+                target_gsea_tables <- paste0(contrasts$id, ".", gmt_name, '.gsea_report_for_na_pos.tsv')
+            }
+
             for (i in 1:nrow(contrasts)){
                 cat("\n###### ", contrast_descriptions[i], "\n")
                 target_gsea_results <- read_metadata(target_gsea_tables[i])[,c(-2,-3)]
