@@ -53,7 +53,7 @@ process GSEA_GSEA {
     # Run GSEA
 
     export HOME=$PWD
-    export JVM_MEM_OPTS="-Xmx6g"
+    export JVM_MEM_OPTS="-Xmx8g"
 
     gsea-cli GSEA \\
         -res $gct \\
