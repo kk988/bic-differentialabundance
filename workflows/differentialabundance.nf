@@ -130,11 +130,12 @@ include { AFFY_JUSTRMA as AFFY_JUSTRMA_NORM                 } from '../modules/n
 include { PROTEUS_READPROTEINGROUPS as PROTEUS              } from '../modules/nf-core/proteus/readproteingroups/main'
 include { GEOQUERY_GETGEO                                   } from '../modules/nf-core/geoquery/getgeo/main'
 include { ZIP as MAKE_REPORT_BUNDLE                         } from '../modules/nf-core/zip/main'
-include { GSEA_GSEA_PRERANKED                               } from '../modules/local/gsea/gsea_preranked'
-include { getFullConditionList                              } from '../modules/local/bic_utils/general'
 include { softwareVersionsToYAML                            } from '../subworkflows/nf-core/utils_nfcore_pipeline'
-include { BIC_PLOTS                                         } from '../subworkflows/local/bic_plots'
 
+// bic modules
+include { BIC_PLOTS                                         } from '../subworkflows/bic/bic_plots'
+include { GSEA_GSEA_PRERANKED                               } from '../modules/bic/gsea/gsea_preranked'
+include { getFullConditionList                              } from '../modules/bic/bic_utils/general'
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     RUN MAIN WORKFLOW

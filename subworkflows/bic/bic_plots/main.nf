@@ -8,12 +8,12 @@ IMPORT FUNCTIONS / MODULES / SUBWORKFLOWS
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-include { HEATMAP } from '../../../modules/local/rnaseq_analysis_modules/heatmap/main'
-include { SAMPLE_TO_SAMPLE_DISTANCE } from '../../../modules/local/rnaseq_analysis_modules/sample_to_sample_distance/main'
-include { PC_LOADING } from '../../../modules/local/rnaseq_analysis_modules/pc_loading/main'
-include { CREATE_SAMPLE_KEY } from '../../../modules/local/bic_utils/create_sample_key'
-include { CREATE_GENE_MAP } from '../../../modules/local/bic_utils/create_gene_map'
-include { MDS_CLUSTERING } from '../../../modules/local/rnaseq_analysis_modules/mds_clustering'
+include { HEATMAP } from '../../../modules/bic/rnaseq_analysis_modules/heatmap/main'
+include { SAMPLE_TO_SAMPLE_DISTANCE } from '../../../modules/bic/rnaseq_analysis_modules/sample_to_sample_distance/main'
+include { PC_LOADING } from '../../../modules/bic/rnaseq_analysis_modules/pc_loading/main'
+include { CREATE_SAMPLE_KEY } from '../../../modules/bic/bic_utils/create_sample_key'
+include { CREATE_GENE_MAP } from '../../../modules/bic/bic_utils/create_gene_map'
+include { MDS_CLUSTERING } from '../../../modules/bic/rnaseq_analysis_modules/mds_clustering'
 
 workflow BIC_PLOTS {
 

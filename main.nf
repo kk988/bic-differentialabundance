@@ -30,9 +30,6 @@ include { getGenomeAttribute      } from './subworkflows/local/utils_nfcore_diff
 */
 
 params.gtf = getGenomeAttribute('gtf')
-params.gsea_run = getGenomeAttribute('gsea_run')
-params.gene_sets_files = getGenomeAttribute('gene_sets_files')
-
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
