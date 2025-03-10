@@ -8,7 +8,7 @@ process PC_LOADING {
 
     input:
     tuple val(meta), path(vst)
-    path(sample_key)
+    tuple val(meta2), path(de_results), val(contrast_meta), path(sample_key) // DE results file 
     path(gene_map)
 
     output:
@@ -17,7 +17,7 @@ process PC_LOADING {
 
     script:
     def args = task.ext.args ?: ''
-    def out_file = "${meta.variable}/png/pc_loading.png"
+    def out_file = "${contrast_meta.id}/png/pc_loading.png"
 
     """
     mkdir -p \$(dirname ${out_file})
@@ -33,7 +33,7 @@ process PC_LOADING {
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         r-base: \$(echo \$(R --version 2>&1) | sed 's/^.*R version //; s/ .*\$//')
-        rnaseq_analysis_modules: \$(echo /rnaseq_analysis_modules/VERSION.txt)
+        rnaseq_analysis_modules: \$(cat /rnaseq_analysis_modules/VERSION.txt)
     END_VERSIONS
     """
 

@@ -8,7 +8,7 @@ process MDS_CLUSTERING {
 
     input:
     tuple val(meta), path(norm)         // normalized counts
-    path(sample_key)                    // sample key
+    tuple val(meta2), path(de_results), val(contrast_meta), path(sample_key) // DE results file 
 
 
     output:
@@ -17,7 +17,7 @@ process MDS_CLUSTERING {
 
     script:
     def args = task.ext.args ?: ''
-    def out_prefix = "${meta.variable}/png/plot"
+    def out_prefix = "${contrast_meta.id}/png/plot"
 
     """
     mkdir -p \$(dirname ${out_prefix})
@@ -33,7 +33,7 @@ process MDS_CLUSTERING {
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         r-base: \$(echo \$(R --version 2>&1) | sed 's/^.*R version //; s/ .*\$//')
-        rnaseq_analysis_modules: \$(echo /rnaseq_analysis_modules/VERSION.txt)
+        rnaseq_analysis_modules: \$(cat /rnaseq_analysis_modules/VERSION.txt)
     END_VERSIONS
     """
 

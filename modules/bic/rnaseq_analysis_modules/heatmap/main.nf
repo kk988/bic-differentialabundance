@@ -8,8 +8,7 @@ process HEATMAP {
 
     input:
     tuple val(meta), path(norm)        // normalized counts
-    tuple val(meta2), path(de_results) // DE results file 
-    path(sample_key)                   // sample key
+    tuple val(meta2), path(de_results), val(contrast_meta), path(sample_key) // DE results file 
     path(gene_map)                     // gene map (gene id to gene name)
     // conditions
     
@@ -42,7 +41,7 @@ process HEATMAP {
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         r-base: \$(echo \$(R --version 2>&1) | sed 's/^.*R version //; s/ .*\$//')
-        rnaseq_analysis_modules: \$(echo /rnaseq_analysis_modules/VERSION.txt)
+        rnaseq_analysis_modules: \$(cat /rnaseq_analysis_modules/VERSION.txt)
     END_VERSIONS
     """
 

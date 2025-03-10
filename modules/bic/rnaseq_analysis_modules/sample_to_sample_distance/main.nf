@@ -7,8 +7,7 @@ process SAMPLE_TO_SAMPLE_DISTANCE {
         '/juno/bic/depot/singularity/bic_rnaseq_modules/tag/2.0.2/bic_rnaseq_modules_2.0.2.simg' }"
 
     input:
-    tuple val(meta), path(vst)
-    path(sample_key)
+    tuple val(meta), path(vst), val(meta2), path(sample_key)
 
     output:
     path '*/png/sample_to_sample_distance.png' , emit: sample_dist
@@ -31,7 +30,7 @@ process SAMPLE_TO_SAMPLE_DISTANCE {
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         r-base: \$(echo \$(R --version 2>&1) | sed 's/^.*R version //; s/ .*\$//')
-        rnaseq_analysis_modules: \$(echo /rnaseq_analysis_modules/VERSION.txt)
+        rnaseq_analysis_modules: \$(cat /rnaseq_analysis_modules/VERSION.txt)
     END_VERSIONS
     """
 
