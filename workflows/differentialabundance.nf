@@ -100,6 +100,13 @@ citations_file = file(params.citations_file, checkIfExists: true)
 include { TABULAR_TO_GSEA_CHIP } from '../modules/local/tabular_to_gsea_chip'
 include { FILTER_DIFFTABLE } from '../modules/local/filter_difftable'
 
+// bic modules
+include { BIC_PLOTS } from '../subworkflows/bic/bic_plots'
+include { GSEA_GSEA_PRERANKED } from '../modules/bic/gsea/gsea_preranked'
+include { getFullConditionList } from '../modules/bic/bic_utils/general'
+include { MOVE_INPUT_FILES } from '../modules/bic/bic_utils/move_input_files'
+include { PREFORMAT_INPUT } from '../modules/bic/preformat_input/main'
+
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     IMPORT NF-CORE MODULES/SUBWORKFLOWS
@@ -130,10 +137,7 @@ include { AFFY_JUSTRMA as AFFY_JUSTRMA_NORM                 } from '../modules/n
 include { PROTEUS_READPROTEINGROUPS as PROTEUS              } from '../modules/nf-core/proteus/readproteingroups/main'
 include { GEOQUERY_GETGEO                                   } from '../modules/nf-core/geoquery/getgeo/main'
 include { ZIP as MAKE_REPORT_BUNDLE                         } from '../modules/nf-core/zip/main'
-include { GSEA_GSEA_PRERANKED                               } from '../modules/local/gsea/gsea_preranked'
-include { getFullConditionList                              } from '../modules/local/bic_utils/general'
 include { softwareVersionsToYAML                            } from '../subworkflows/nf-core/utils_nfcore_pipeline'
-include { BIC_PLOTS                                         } from '../subworkflows/local/bic_plots'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -147,6 +151,24 @@ workflow DIFFERENTIALABUNDANCE {
     ch_versions = Channel.empty()
     // Channel for the contrasts file
     ch_contrasts_file = Channel.from([[exp_meta, file(params.contrasts)]])
+
+    // Move the input files to the workdir
+    MOVE_INPUT_FILES(
+        ch_input,
+        ch_contrasts_file,
+        ch_in_raw
+    )
+    ch_versions = ch_versions.mix(MOVE_INPUT_FILES.out.versions)
+
+    // Now that input and constrasts files hare created - we can preformat the input file
+    PREFORMAT_INPUT(
+        ch_input,
+        ch_contrasts_file,
+        ch_in_raw
+    )
+    ch_input = PREFORMAT_INPUT.out.updated_input
+    ch_in_raw = PREFORMAT_INPUT.out.updated_counts
+    ch_versions = ch_versions.mix(PREFORMAT_INPUT.out.versions)
 
     // If we have affy array data in the form of CEL files we'll be deriving
     // matrix and annotation from them
@@ -456,6 +478,7 @@ workflow DIFFERENTIALABUNDANCE {
             if (cond_list.findAll { it == cndtn }.size() < 3) {
                 log.warn "Condition ${cndtn} has less than 3 samples. Prerank will run for ALL comparisons."
                 run_prerank = true
+                break
             }
         }
 
@@ -569,11 +592,12 @@ workflow DIFFERENTIALABUNDANCE {
 
     ch_vst = DESEQ2_NORM.out.vst_counts
     BIC_PLOTS(
-        ch_input,       // channel [meta, input.csv]
-        ch_in_raw,      // channel [meta, counts]
-        ch_vst,         // channel [meta, vst]
-        ch_norm,        // channel [meta, normalized counts]
-        ch_differential // channel [meta, diff results]
+        ch_input,             // channel [meta, input.csv]
+        ch_in_raw,            // channel [meta, counts]
+        ch_vst,               // channel [meta, vst]
+        ch_norm,              // channel [meta, normalized counts]
+        ch_differential,      // channel [meta, diff results]
+        ch_contrast_variables // channel [meta]
     )
 
     // Gather software versions
@@ -688,7 +712,7 @@ workflow DIFFERENTIALABUNDANCE {
     RMARKDOWNNOTEBOOK(
         ch_report_file,
         ch_report_params,
-        ch_report_input_files
+        ch_report_input_files 
     )
 
     // Make a report bundle comprising the markdown document and all necessary

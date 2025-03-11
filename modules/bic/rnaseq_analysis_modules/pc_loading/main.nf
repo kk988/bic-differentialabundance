@@ -1,4 +1,4 @@
-process MDS_CLUSTERING {
+process PC_LOADING {
     tag "$meta.id"
     label 'process_single'
 
@@ -7,33 +7,33 @@ process MDS_CLUSTERING {
         '/juno/bic/depot/singularity/bic_rnaseq_modules/tag/2.0.2/bic_rnaseq_modules_2.0.2.simg' }"
 
     input:
-    tuple val(meta), path(norm)         // normalized counts
-    path(sample_key)                    // sample key
-
+    tuple val(meta), path(vst)
+    tuple val(meta2), path(de_results), val(contrast_meta), path(sample_key) // DE results file 
+    path(gene_map)
 
     output:
-    path '*/png/plot_MDS.png' , emit: plot
+    path '*/png/pc_loading.png' , emit: plot
     path "versions.yml" , emit: versions
 
     script:
     def args = task.ext.args ?: ''
-    def out_prefix = "${meta.variable}/png/plot"
+    def out_file = "${contrast_meta.id}/png/pc_loading.png"
 
     """
-    mkdir -p \$(dirname ${out_prefix})
+    mkdir -p \$(dirname ${out_file})
 
-    Rscript /rnaseq_analysis_modules/sample_clustering.R \
-    --norm_counts ${norm} \
+    Rscript /rnaseq_analysis_modules/make_pca_loading_plot.R \
+    --vsd ${vst} \
     --key_file ${sample_key} \
-    --out_prefix ${out_prefix} \
-    --method MDS \
+    --out_file ${out_file} \
+    --gene_map ${gene_map} \
     --file_type png \
     ${args}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         r-base: \$(echo \$(R --version 2>&1) | sed 's/^.*R version //; s/ .*\$//')
-        rnaseq_analysis_modules: \$(echo /rnaseq_analysis_modules/VERSION.txt)
+        rnaseq_analysis_modules: \$(cat /rnaseq_analysis_modules/VERSION.txt)
     END_VERSIONS
     """
 
