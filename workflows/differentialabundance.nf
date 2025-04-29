@@ -102,10 +102,12 @@ include { FILTER_DIFFTABLE } from '../modules/local/filter_difftable'
 
 // bic modules
 include { BIC_PLOTS } from '../subworkflows/bic/bic_plots'
+include { CREATE_GENE_MAP } from '../../../modules/bic/bic_utils/create_gene_map'
 include { GSEA_GSEA_PRERANKED } from '../modules/bic/gsea/gsea_preranked'
 include { getFullConditionList } from '../modules/bic/bic_utils/general'
 include { MOVE_INPUT_FILES } from '../modules/bic/bic_utils/move_input_files'
 include { PREFORMAT_INPUT } from '../modules/bic/preformat_input/main'
+include { REFORMAT_DE } from '../modules/bic/bic_utils/reformat_de/main'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -484,7 +486,7 @@ workflow DIFFERENTIALABUNDANCE {
 
         if(run_prerank) {
             GSEA_GSEA_PRERANKED(
-                ch_differential, 
+                ch_differential,
                 ch_gene_sets.first(),
                 TABULAR_TO_GSEA_CHIP.out.chip.first())
 
@@ -590,10 +592,24 @@ workflow DIFFERENTIALABUNDANCE {
         ch_all_matrices
     )
 
+    // BIC SPECIFIC
+    // need to make gene map from counts file
+    CREATE_GENE_MAP(ch_in_raw)
+    ch_gene_map = CREATE_GENE_MAP.out.gene_map.first()
+    ch_versions = ch_versions.mix(CREATE_GENE_MAP.out.versions)
+
+    // ch_filtered_diff filtered tsv
+    // ch_differential is DESEQ output.
+    ch_de_data = ch_differential.join(ch_filtered_diff).join(DESEQ2_NORM.out.rdata)
+    REFORMAT_DE(
+        ch_de_data,
+        ch_gene_map,
+    )
+
     ch_vst = DESEQ2_NORM.out.vst_counts
     BIC_PLOTS(
         ch_input,             // channel [meta, input.csv]
-        ch_in_raw,            // channel [meta, counts]
+        ch_gene_map,          // value channel gene map
         ch_vst,               // channel [meta, vst]
         ch_norm,              // channel [meta, normalized counts]
         ch_differential,      // channel [meta, diff results]
@@ -712,7 +728,7 @@ workflow DIFFERENTIALABUNDANCE {
     RMARKDOWNNOTEBOOK(
         ch_report_file,
         ch_report_params,
-        ch_report_input_files 
+        ch_report_input_files
     )
 
     // Make a report bundle comprising the markdown document and all necessary
