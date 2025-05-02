@@ -102,12 +102,12 @@ include { FILTER_DIFFTABLE } from '../modules/local/filter_difftable'
 
 // bic modules
 include { BIC_PLOTS } from '../subworkflows/bic/bic_plots'
-include { CREATE_GENE_MAP } from '../../../modules/bic/bic_utils/create_gene_map'
+include { CREATE_GENE_MAP } from '../modules/bic/bic_utils/create_gene_map'
 include { GSEA_GSEA_PRERANKED } from '../modules/bic/gsea/gsea_preranked'
 include { getFullConditionList } from '../modules/bic/bic_utils/general'
 include { MOVE_INPUT_FILES } from '../modules/bic/bic_utils/move_input_files'
 include { PREFORMAT_INPUT } from '../modules/bic/preformat_input/main'
-include { REFORMAT_DE } from '../modules/bic/bic_utils/reformat_de/main'
+include { REFORMAT_DE } from '../modules/bic/bic_utils/reformat_de'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -598,12 +598,11 @@ workflow DIFFERENTIALABUNDANCE {
     ch_gene_map = CREATE_GENE_MAP.out.gene_map.first()
     ch_versions = ch_versions.mix(CREATE_GENE_MAP.out.versions)
 
-    // ch_filtered_diff filtered tsv
     // ch_differential is DESEQ output.
-    ch_de_data = ch_differential.join(ch_filtered_diff).join(DESEQ2_NORM.out.rdata)
+    ch_de_data = ch_differential.join(FILTER_DIFFTABLE.out.filtered).join(DESEQ2_DIFFERENTIAL.out.rdata)
     REFORMAT_DE(
         ch_de_data,
-        ch_gene_map,
+        ch_gene_map
     )
 
     ch_vst = DESEQ2_NORM.out.vst_counts
