@@ -21,6 +21,10 @@ new_de <- merge(de_gene_map, baseMeanPerLvl, by.x="GeneID", by.y="row.names", al
 
 # rename mean counts columns
 colnames(new_de)[colnames(new_de) %in% c('$meta.target', '$meta.reference')] <- c(paste0("Mean_at_cond_",'$meta.target'), paste0("Mean_at_cond_",'$meta.reference'))
+
+# Remove rows where GeneID starts with "__"
+new_de <- new_de[!grepl("^__", new_de[[GeneID]]), ]
+
 # Move "GeneSymbol" to the second position and remove "baseMean"
 new_de <- new_de[, c(names(new_de)[1], "GeneSymbol", setdiff(names(new_de)[-1], c("GeneSymbol", "baseMean")))]
 
