@@ -58,8 +58,8 @@ Most plots are included in the HTML report (see above), but are also included in
     - `all.normalised_counts.tsv`: Normalised counts table (DESeq2)
     - `all.vst.tsv`: Normalised counts table with a variance-stabilising transform (DESeq2)
   - `differential/`: Directory containing tables of differential statistics reported by differential modules such as DESeq2
-    - `[contrast].deseq2.results.tsv`: Results of DESeq2 differential analyis (RNA-seq)
-    - `[contrast].deseq2.results_filtered.tsv`: Results of DESeq2 differential analyis (RNA-seq) filtered to cutoff thresholds
+    - `[contrast].deseq2.de_results.tsv`: Results of DESeq2 differential analyis (RNA-seq)
+    - `[contrast].deseq2.de_results_filtered.tsv`: Results of DESeq2 differential analyis (RNA-seq) filtered to cutoff thresholds
 
 </details>
 
@@ -116,4 +116,4 @@ The `differential` folder is likely to be the core result set for most users, co
 
 **Problem:** Potential issues or bugs in the nf-core differential abundance workflow can affect the detection of differential expression or data analysis.
 
-**Suggested course of action:** Report any issues or suspected bugs by emailing bioinformatics core at bicrequest@mskcc.org 
+**Suggested course of action:** Report any issues or suspected bugs by emailing bioinformatics core at bicrequest@mskcc.org
