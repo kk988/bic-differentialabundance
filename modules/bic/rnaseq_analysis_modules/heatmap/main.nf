@@ -8,12 +8,12 @@ process HEATMAP {
 
     input:
     tuple val(meta), path(norm)        // normalized counts
-    tuple val(meta2), path(de_results), val(contrast_meta), path(sample_key) // DE results file 
+    tuple val(meta2), path(de_results), val(contrast_meta), path(sample_key) // DE results file
     path(gene_map)                     // gene map (gene id to gene name)
     // conditions
-    
+
     output:
-    path '*/png/*.png'  , emit: heatmaps //heatmaps
+    path '*/png/*.png'  , emit: heatmaps, optional: true //heatmaps only generated if DE genes found
     path "versions.yml" , emit: versions
 
     script:
@@ -26,17 +26,23 @@ process HEATMAP {
 
     pull_DE_genes.R ${de_results} ${gene_map} gene_list.txt
 
-    Rscript /rnaseq_analysis_modules/make_de_heatmap.R \
-    --norm_counts_file ${norm} \
-    --key_file ${sample_key} \
-    --annotate_samples \
-    --title "${title}" \
-    --conditions ${meta2.reference},${meta2.target} \
-    --gene_map ${gene_map} \
-    --out_file ${out_file} \
-    --file_type png \
-    --gene_file gene_list.txt \
-    ${args}
+    num_de=\$(wc -w gene_list.txt | awk '{print \$1}')
+
+    if [ "\${num_de}" -eq 0 ]; then
+        echo "No DE genes found for ${meta2.reference} vs ${meta2.target}. Skipping heatmap generation."
+    else
+        Rscript /rnaseq_analysis_modules/make_de_heatmap.R \
+        --norm_counts_file ${norm} \
+        --key_file ${sample_key} \
+        --annotate_samples \
+        --title "${title}" \
+        --conditions ${meta2.reference},${meta2.target} \
+        --gene_map ${gene_map} \
+        --out_file ${out_file} \
+        --file_type png \
+        --gene_file gene_list.txt \
+        ${args}
+    fi
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

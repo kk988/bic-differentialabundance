@@ -7,6 +7,16 @@
 # file. The new DE results file will contain the following columns:
 # GeneID, GeneSymbol, log2FoldChange, meancounts(per condition), lfcSE, pvalue, padj
 
+
+get_base_mean <- function(lvl, rds) {
+    if (ncol( rds[,rds[['$meta.variable']] == lvl]) == 1){
+        # If there is only one column, return the counts for that column
+        return(DESeq2::counts(rds, normalized=TRUE)[, rds[['$meta.variable']] == lvl])
+    }
+    # Get the mean counts for the specified level
+    return(rowMeans(DESeq2::counts(rds, normalized=TRUE)[, rds[['$meta.variable']] == lvl]))
+}
+
 # read rds, de_results (tsv), filtered_de (tsv), and gene_map (tsv)
 rds <- readRDS('$rdata')
 de <- read.table('$de_results', header=TRUE, sep="\t") # GeneID baseMean log2FoldChange lfcSE pvalue padj
@@ -15,7 +25,7 @@ gene_map <- read.table('$gene_map', header=TRUE, sep="\t") # GeneID, GeneSymbol
 
 
 # combine de results, gene symbols, and mean counts
-baseMeanPerLvl <- sapply( c('$meta.target', '$meta.reference'), function(lvl) rowMeans( DESeq2::counts(rds,normalized=TRUE)[,rds[['$meta.variable']] == lvl] ) )
+baseMeanPerLvl <- sapply( c('$meta.target', '$meta.reference'), function(lvl) get_base_mean(lvl, rds) )
 de_gene_map <- merge(de, gene_map, by="GeneID", all.x=TRUE)
 new_de <- merge(de_gene_map, baseMeanPerLvl, by.x="GeneID", by.y="row.names", all.x=TRUE )
 
@@ -23,7 +33,7 @@ new_de <- merge(de_gene_map, baseMeanPerLvl, by.x="GeneID", by.y="row.names", al
 colnames(new_de)[colnames(new_de) %in% c('$meta.target', '$meta.reference')] <- c(paste0("Mean_at_cond_",'$meta.target'), paste0("Mean_at_cond_",'$meta.reference'))
 
 # Remove rows where GeneID starts with "__"
-new_de <- new_de[!grepl("^__", new_de[[GeneID]]), ]
+new_de <- new_de[!grepl("^__", new_de[["GeneID"]]), ]
 
 # Move "GeneSymbol" to the second position and remove "baseMean"
 new_de <- new_de[, c(names(new_de)[1], "GeneSymbol", setdiff(names(new_de)[-1], c("GeneSymbol", "baseMean")))]
