@@ -12,19 +12,18 @@ include { HEATMAP } from '../../../modules/bic/rnaseq_analysis_modules/heatmap/m
 include { SAMPLE_TO_SAMPLE_DISTANCE } from '../../../modules/bic/rnaseq_analysis_modules/sample_to_sample_distance/main'
 include { PC_LOADING } from '../../../modules/bic/rnaseq_analysis_modules/pc_loading/main'
 include { CREATE_SAMPLE_KEY } from '../../../modules/bic/bic_utils/create_sample_key'
-include { CREATE_GENE_MAP } from '../../../modules/bic/bic_utils/create_gene_map'
 include { MDS_CLUSTERING } from '../../../modules/bic/rnaseq_analysis_modules/mds_clustering'
 
 workflow BIC_PLOTS {
 
     take:
     ch_input  // channel [meta, input.csv]  used in creating sample key
-    ch_in_raw // channel [meta, counts] used in creating gene map, possibly some modules
+    ch_gene_map // value channel gene_map used in creating gene map
     ch_vst    // channel [meta, vst]
     ch_norm   // channel [meta, normalized counts]
     ch_diff   // channel [meta(id,variable,reference,target,blocking), diff_results]
     ch_contrast_variables // channel [meta(id)]
-    
+
     main:
     ch_versions = Channel.empty()
 
@@ -33,11 +32,6 @@ workflow BIC_PLOTS {
     ch_sample_key = CREATE_SAMPLE_KEY.out.sample_key
     ch_versions = ch_versions.mix(CREATE_SAMPLE_KEY.out.versions)
 
-    // need to make gene map from counts file
-    CREATE_GENE_MAP(ch_in_raw)
-    ch_gene_map = CREATE_GENE_MAP.out.gene_map.first()
-    ch_versions = ch_versions.mix(CREATE_GENE_MAP.out.versions)
-
     // merge vst results with sample key where the contrast variable match in the meta data
     ch_contrast_vst = ch_vst.combine(ch_sample_key)
                             .filter{ it -> it[2].id == it[0].variable }
@@ -45,7 +39,7 @@ workflow BIC_PLOTS {
     // Sample to sample distance
     SAMPLE_TO_SAMPLE_DISTANCE(ch_contrast_vst)
     ch_versions = ch_versions.mix(SAMPLE_TO_SAMPLE_DISTANCE.out.versions)
- 
+
     // merge diff results with sample key where the contrast variables match in the meta
     ch_contrast_diff = ch_diff.combine(ch_sample_key)
                         .filter{ it -> it[2].id == it[0].variable }
