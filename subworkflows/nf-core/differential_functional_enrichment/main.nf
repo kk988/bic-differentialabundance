@@ -6,9 +6,12 @@ include { GPROFILER2_GOST          } from '../../../modules/nf-core/gprofiler2/g
 include { CUSTOM_TABULARTOGSEAGCT  } from '../../../modules/nf-core/custom/tabulartogseagct/main.nf'
 include { CUSTOM_TABULARTOGSEACLS  } from '../../../modules/nf-core/custom/tabulartogseacls/main.nf'
 include { CUSTOM_TABULARTOGSEACHIP } from '../../../modules/nf-core/custom/tabulartogseachip/main.nf'
+include { CUSTOM_TABULARTOGSEACHIP as CUSTOM_TABULARTOGSEACHIP_PRERANKED } from '../../../modules/nf-core/custom/tabulartogseachip/main.nf'
 include { GSEA_GSEA                } from '../../../modules/nf-core/gsea/gsea/main.nf'
 include { PROPR_GREA               } from '../../../modules/nf-core/propr/grea/main.nf'
 include { DECOUPLER_DECOUPLER      } from '../../../modules/nf-core/decoupler/decoupler/main'
+
+include { GSEA_GSEA_PRERANKED      } from '../../../modules/bic/gsea/gsea_preranked'
 
 // Combine meta maps, including merging non-identical values of shared keys (e.g. 'id')
 def mergeMaps(meta, meta2){
@@ -30,6 +33,10 @@ workflow DIFFERENTIAL_FUNCTIONAL_ENRICHMENT {
     ch_contrasts             // [ meta, [meta_contrast], [variable], [reference], [target], [formula], [comparison] ]
     ch_samplesheet           // [ meta, samples sheet ]
     ch_featuresheet          // [ meta, features sheet, features id, features symbol ]
+
+    // preranked GSEA input, used instead of standard GSEA when a condition has < 3 samples.
+    // Pass channel.empty() to disable.
+    ch_gsea_preranked_input  // [ meta, differential results, genesets file, features sheet, features id, features symbol ]
 
     main:
 
@@ -117,42 +124,40 @@ workflow DIFFERENTIAL_FUNCTIONAL_ENRICHMENT {
             [meta, chip]
         }
 
-    // If any group has < 3 samples, run GSEA_GSEA_PRERANKED instead of GSEA_GSEA
-    // Check that the conditions have at least 3 samples
-    def run_prerank = false
-    def cond_list = getFullConditionList()
+    GSEA_GSEA(
+        ch_in_gsea.input,
+        ch_in_gsea.ref_target,
+        ch_in_gsea.chip
+    )
 
-    // Get unique conditions
-    def unique_cond = cond_list.unique(false)
+    // ----------------------------------------------------
+    // Perform enrichment analysis with preranked GSEA
+    // ----------------------------------------------------
 
-    // Iterate over the unique conditions and check sample sizes
-    for (cndtn in unique_cond) {
-        if (cond_list.findAll { it == cndtn }.size() < 3) {
-            log.warn "Condition ${cndtn} has less than 3 samples. Prerank will run for ALL comparisons."
-            run_prerank = true
-            break
+    ch_input_for_gsea_preranked = ch_gsea_preranked_input
+        .multiMap { meta, results, genesets, featuresheet, features_id, features_symbol ->
+            def meta_with_method = meta + [ 'functional_method': 'gsea' ]
+            input:
+                [ meta_with_method, results, genesets ]
+            features:
+                [ meta_with_method, featuresheet ]
+            features_cols:
+                [ features_id, features_symbol ]
         }
-    }
 
-    if(run_prerank) {
-            GSEA_GSEA_PRERANKED(
-                ch_differential,
-                ch_gene_sets.first(),
-                TABULAR_TO_GSEA_CHIP.out.chip.first())
+    CUSTOM_TABULARTOGSEACHIP_PRERANKED(
+        ch_input_for_gsea_preranked.features,
+        ch_input_for_gsea_preranked.features_cols
+    )
 
-            ch_gsea_results = GSEA_GSEA_PRERANKED.out.report_tsvs_ref
-                .join(GSEA_GSEA_PRERANKED.out.report_tsvs_target)
+    GSEA_GSEA_PRERANKED(
+        ch_input_for_gsea_preranked.input
+            .join(CUSTOM_TABULARTOGSEACHIP_PRERANKED.out.chip)
+    )
 
-            // Record GSEA versions
-            ch_versions = ch_versions
-                .mix(GSEA_GSEA_PRERANKED.out.versions)
-    } else {
-        GSEA_GSEA(
-            ch_in_gsea.input,
-            ch_in_gsea.ref_target,
-            ch_in_gsea.chip
-        )
-    }
+    ch_versions = ch_versions
+        .mix(GSEA_GSEA_PRERANKED.out.versions)
+
     // ----------------------------------------------------
     // Perform enrichment analysis with DECOUPLER
     // ----------------------------------------------------
@@ -196,25 +201,28 @@ workflow DIFFERENTIAL_FUNCTIONAL_ENRICHMENT {
     gprofiler2_filtered_gmt         = GPROFILER2_GOST.out.filtered_gmt
 
     // gsea-specific outputs
+    // (standard and preranked GSEA are mutually exclusive, so at most one of each pair is non-empty)
     gsea_report_tsv                 = GSEA_GSEA.out.report_tsvs_ref.join(GSEA_GSEA.out.report_tsvs_target)
+                                        .mix(GSEA_GSEA_PRERANKED.out.report_tsvs_ref.join(GSEA_GSEA_PRERANKED.out.report_tsvs_target))
     gsea_report_html                = GSEA_GSEA.out.report_htmls_ref.join(GSEA_GSEA.out.report_htmls_target)
-    gsea_index_html                 = GSEA_GSEA.out.index_html
+                                        .mix(GSEA_GSEA_PRERANKED.out.report_htmls_ref.join(GSEA_GSEA_PRERANKED.out.report_htmls_target))
+    gsea_index_html                 = GSEA_GSEA.out.index_html.mix(GSEA_GSEA_PRERANKED.out.index_html)
     gsea_heat_map_corr_plot         = GSEA_GSEA.out.heat_map_corr_plot
-    gsea_ranked_gene_list           = GSEA_GSEA.out.ranked_gene_list
-    gsea_gene_set_sizes             = GSEA_GSEA.out.gene_set_sizes
-    gsea_histogram                  = GSEA_GSEA.out.histogram
+    gsea_ranked_gene_list           = GSEA_GSEA.out.ranked_gene_list.mix(GSEA_GSEA_PRERANKED.out.ranked_gene_list)
+    gsea_gene_set_sizes             = GSEA_GSEA.out.gene_set_sizes.mix(GSEA_GSEA_PRERANKED.out.gene_set_sizes)
+    gsea_histogram                  = GSEA_GSEA.out.histogram.mix(GSEA_GSEA_PRERANKED.out.histogram)
     gsea_heatmap                    = GSEA_GSEA.out.heatmap
-    gsea_pvalues_vs_nes_plot        = GSEA_GSEA.out.pvalues_vs_nes_plot
+    gsea_pvalues_vs_nes_plot        = GSEA_GSEA.out.pvalues_vs_nes_plot.mix(GSEA_GSEA_PRERANKED.out.pvalues_vs_nes_plot)
     gsea_ranked_list_corr           = GSEA_GSEA.out.ranked_list_corr
     gsea_butterfly_plot             = GSEA_GSEA.out.butterfly_plot
-    gsea_gene_set_tsv               = GSEA_GSEA.out.gene_set_tsv
-    gsea_gene_set_html              = GSEA_GSEA.out.gene_set_html
-    gsea_gene_set_heatmap           = GSEA_GSEA.out.gene_set_heatmap
-    gsea_gene_set_enplot            = GSEA_GSEA.out.gene_set_enplot
-    gsea_gene_set_dist              = GSEA_GSEA.out.gene_set_dist
-    gsea_snapshot                   = GSEA_GSEA.out.snapshot
-    gsea_archive                    = GSEA_GSEA.out.archive
-    gsea_rpt                        = GSEA_GSEA.out.rpt
+    gsea_gene_set_tsv               = GSEA_GSEA.out.gene_set_tsv.mix(GSEA_GSEA_PRERANKED.out.gene_set_tsv)
+    gsea_gene_set_html              = GSEA_GSEA.out.gene_set_html.mix(GSEA_GSEA_PRERANKED.out.gene_set_html)
+    gsea_gene_set_heatmap           = GSEA_GSEA.out.gene_set_heatmap.mix(GSEA_GSEA_PRERANKED.out.gene_set_heatmap)
+    gsea_gene_set_enplot            = GSEA_GSEA.out.gene_set_enplot.mix(GSEA_GSEA_PRERANKED.out.gene_set_enplot)
+    gsea_gene_set_dist              = GSEA_GSEA.out.gene_set_dist.mix(GSEA_GSEA_PRERANKED.out.gene_set_dist)
+    gsea_snapshot                   = GSEA_GSEA.out.snapshot.mix(GSEA_GSEA_PRERANKED.out.snapshot)
+    gsea_archive                    = GSEA_GSEA.out.archive.mix(GSEA_GSEA_PRERANKED.out.archive)
+    gsea_rpt                        = GSEA_GSEA.out.rpt.mix(GSEA_GSEA_PRERANKED.out.rpt)
 
     // decoupler-specific outputs
     decoupler_dc_estimate           = DECOUPLER_DECOUPLER.out.dc_estimate

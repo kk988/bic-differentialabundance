@@ -522,8 +522,7 @@ png(
     width = 600,
     height = 600
 )
-
-plotMA(dds)
+DESeq2::plotMA(dds)
 dev.off()
 
 # R object for other processes to use

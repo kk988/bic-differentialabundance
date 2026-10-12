@@ -10,10 +10,9 @@ include { prepareModuleOutput    } from '../subworkflows/local/utils_nfcore_diff
 // bic modules
 include { BIC_PLOTS } from '../subworkflows/bic/bic_plots'
 include { CREATE_GENE_MAP } from '../modules/bic/bic_utils/create_gene_map'
-include { GSEA_GSEA_PRERANKED } from '../modules/bic/gsea/gsea_preranked'
-include { getFullConditionList } from '../modules/bic/bic_utils/general'
 include { MOVE_INPUT_FILES } from '../modules/bic/bic_utils/move_input_files'
 include { PREFORMAT_INPUT } from '../modules/bic/preformat_input/main'
+include { getFullConditionList     } from '../modules/bic/bic_utils/general'
 include { REFORMAT_DE } from '../modules/bic/bic_utils/reformat_de'
 
 /*
@@ -73,6 +72,35 @@ workflow DIFFERENTIALABUNDANCE {
             [ meta, file(meta.params.input, checkIfExists: true) ]
         }
 
+    // Create contrasts channels
+    ch_contrasts_file = ch_paramsets
+        .map { meta ->
+            [ meta, file(meta.params.contrasts, checkIfExists: true) ]
+        }
+
+    // BIC ADDITION
+    // First move input files to the workdir
+    MOVE_INPUT_FILES(
+        ch_paramsets.map { meta -> [ meta, file(meta.params.input, checkIfExists: true) ] },
+        ch_paramsets.map { meta -> [ meta, file(meta.params.contrasts, checkIfExists: true) ] },
+        ch_paramsets.map { meta -> [ meta, file(meta.params.matrix, checkIfExists: true) ] }
+    )
+    ch_versions = ch_versions.mix(MOVE_INPUT_FILES.out.versions)
+
+    // Now that input and constrasts files are created - we can preformat the input file
+    ch_matrix = ch_paramsets.map{meta -> [ meta, file(meta.params.matrix, checkIfExists: true) ] }
+    PREFORMAT_INPUT(
+        ch_samplesheet,
+        ch_contrasts_file,
+        ch_matrix
+    )
+
+    ch_samplesheet = PREFORMAT_INPUT.out.updated_input
+    ch_matrix = PREFORMAT_INPUT.out.updated_counts
+    ch_versions = ch_versions.mix(PREFORMAT_INPUT.out.versions)
+
+    // END OF BIC ADDITION
+
     // Create input channels based on study type
     ch_input = ch_samplesheet
         .branch { meta, input ->
@@ -90,9 +118,7 @@ workflow DIFFERENTIALABUNDANCE {
 
     // Handle Maxquant inputs
     ch_maxquant_inputs = ch_input.maxquant
-        .map { meta, input ->
-            [ meta, input, file(meta.params.matrix, checkIfExists: true) ]
-        }
+        .join(ch_matrix)
 
     // Handle GEO soft file inputs
     ch_querygse = ch_input.geo_soft_file
@@ -124,11 +150,7 @@ workflow DIFFERENTIALABUNDANCE {
     // Handle contrasts
     // ========================================================================
 
-    // Create contrasts channels
-    ch_contrasts_file = ch_paramsets
-        .map { meta ->
-            [ meta, file(meta.params.contrasts, checkIfExists: true) ]
-        }
+    
 
     ch_contrasts_file_with_extension = ch_contrasts_file
         .map { meta, file ->
@@ -255,30 +277,10 @@ workflow DIFFERENTIALABUNDANCE {
 
     // Raw inputs
 
-    ch_in_raw = ch_input.rnaseq
-        .map{meta, input -> [meta, file(meta.params.matrix, checkIfExists: true)]}
+    ch_in_raw = ch_matrix
+        .filter { meta, matrix -> meta.params.study_type in ['rnaseq', 'generic_matrix'] }
         .mix(ch_affy_raw)
         .mix(ch_proteus_raw)
-
-    // BIC ADDITION
-    // Move the input files to the workdir
-    MOVE_INPUT_FILES(
-        ch_input,
-        ch_contrasts_file,
-        ch_in_raw
-    )
-    ch_versions = ch_versions.mix(MOVE_INPUT_FILES.out.versions)
-
-    // Now that input and constrasts files hare created - we can preformat the input file
-    PREFORMAT_INPUT(
-        ch_input,
-        ch_contrasts_file,
-        ch_in_raw
-    )
-    ch_input = PREFORMAT_INPUT.out.updated_input
-    ch_in_raw = PREFORMAT_INPUT.out.updated_counts
-    ch_versions = ch_versions.mix(PREFORMAT_INPUT.out.versions)
-    // END OF BIC ADDITION
 
 
     // Normalised inputs
@@ -599,13 +601,33 @@ workflow DIFFERENTIALABUNDANCE {
         )
     // Prepare input for functional analysis
 
-    // - use normalized matrix, if method is gsea
+    // If any group has < 3 samples, run GSEA_GSEA_PRERANKED instead of GSEA_GSEA
+    // Check that the conditions have at least 3 samples
+    def cond_list = getFullConditionList()
+
+    // Get unique conditions
+    def unique_cond = cond_list.unique(false)
+
+    // Iterate over the unique conditions and check sample sizes
+    def small_cond = unique_cond.find { cndtn ->
+        cond_list.count(cndtn) < 3
+    }
+    def run_prerank = small_cond != null
+    if (run_prerank) {
+        log.warn "Condition ${small_cond} has less than 3 samples. Preranked GSEA will run for ALL comparisons."
+    }
+
+    // - use normalized matrix, if method is gsea (standard GSEA only)
     // - use filtered differential results, if method is gprofiler2
     // - use unfiltered differential results, if method is decoupler
     // - use propd adjacency matrix, if method is grea
-    ch_functional_analysis_matrices = ch_norm
-        .filter{meta, matrix -> meta.params.functional_method == 'gsea'}
-        .map{ meta, matrix -> [meta, meta, matrix]}
+    ch_gsea_matrices = run_prerank
+        ? channel.empty()
+        : ch_norm
+            .filter{meta, matrix -> meta.params.functional_method == 'gsea'}
+            .map{ meta, matrix -> [meta, meta, matrix]}
+
+    ch_functional_analysis_matrices = ch_gsea_matrices
         .mix(
             ch_differential_results_filtered
                 // Remember that the meta from differential results contain contrast info.
@@ -641,13 +663,28 @@ workflow DIFFERENTIALABUNDANCE {
             features: [meta, features, meta.params.features_id_col, meta.params.features_name_col]
         }
 
-    // Run functional analysis
+    // Preranked GSEA ranks genes from the unfiltered differential results,
+    // so it needs no GCT/CLS; only gene sets and the feature sheet (for the CHIP file)
+    ch_gsea_preranked_input = run_prerank
+        ? ch_differential_results                    // key, meta with contrast, results
+            .filter{meta, meta_with_contrast, results -> meta.params.functional_method == 'gsea'}
+            .combine(ch_gene_sets, by:0)             // key, [gmt files]
+            .combine(ch_validated_featuremeta, by:0) // key, features
+            .map { it.tail() }
+        : channel.empty()
 
+    ch_gsea_preranked_input = prepareModuleInput(ch_gsea_preranked_input, 'functional')
+        .map { meta, results, gene_sets, features ->
+            [meta, results, gene_sets, features, meta.params.features_id_col, meta.params.features_name_col]
+        }
+
+    // Run functional analysis
     DIFFERENTIAL_FUNCTIONAL_ENRICHMENT(
         ch_functional_input.input,
         ch_functional_input.contrasts,
         ch_functional_input.samplesheet,
-        ch_functional_input.features
+        ch_functional_input.features,
+        ch_gsea_preranked_input
     )
 
     // Collect functional analysis results
@@ -734,30 +771,39 @@ workflow DIFFERENTIALABUNDANCE {
     ch_gene_map = CREATE_GENE_MAP.out.gene_map.first()
     ch_versions = ch_versions.mix(CREATE_GENE_MAP.out.versions)
 
+    ch_rdata = prepareModuleOutput(
+    ABUNDANCE_DIFFERENTIAL_FILTER.out.rdata,
+    ch_paramsets,
+    ['differential_method'],
+    true
+)
+
     // ch_differential is DESEQ output.
-    ch_de_data = ch_differential.join(FILTER_DIFFTABLE.out.filtered).join(DESEQ2_DIFFERENTIAL.out.rdata)
+    ch_de_data = ch_differential_results
+    .map { key, meta, results -> [meta.id, meta, results] }
+    .join(ch_differential_results_filtered.map { key, meta, filtered -> [meta.id, filtered] })
+    .join(ch_rdata.map { key, meta, rdata -> [meta.id, rdata] })
+    .map { id, meta, results, filtered, rdata ->
+        [meta, results, filtered, rdata]
+    }
+    
     REFORMAT_DE(
         ch_de_data,
         ch_gene_map
     )
 
-    ch_vst = DESEQ2_NORM.out.vst_counts
     BIC_PLOTS(
-        ch_input,             // channel [meta, input.csv]
-        ch_gene_map,          // value channel gene map
-        ch_vst,               // channel [meta, vst]
-        ch_norm,              // channel [meta, normalized counts]
-        ch_differential,      // channel [meta, diff results]
-        ch_contrast_variables // channel [meta]
+        ch_input.rnaseq,                // channel [meta, input.csv]
+        ch_gene_map,             // value channel gene map
+        ch_differential_varstab, // channel [meta, vst]
+        ch_norm,                 // channel [meta, normalized counts]
+        ch_differential_results, // channel [meta, diff results]
+        ch_contrast_variables    // channel [meta, variable]
     )
 
     // Gather software versions
 
-    ch_versions = ch_versions
-        .mix(VALIDATOR.out.versions)
-        .mix(PLOT_EXPLORATORY.out.versions)
-        .mix(PLOT_DIFFERENTIAL.out.versions)
-        .mix(BIC_PLOTS.out.versions)
+    ch_versions = ch_versions.mix(BIC_PLOTS.out.versions)
 
     // ========================================================================
     // ShinyNGS app
@@ -1016,8 +1062,14 @@ workflow DIFFERENTIALABUNDANCE {
     gtf_annotation             = ch_gtf_features
 
     // --- Differential ---
-    diff_results               = ch_differential_results
-    diff_results_filtered      = ch_differential_results_filtered
+    diff_results  = REFORMAT_DE.out.reformatted_de.map { meta, file ->
+        def key = [id: meta.params.study_name, paramset_name: meta.paramset_name, params: meta.params]
+        [key, meta, file]
+    }
+    diff_results_filtered = REFORMAT_DE.out.filtered_reformatted_de.map { meta, file ->
+        def key = [id: meta.params.study_name, paramset_name: meta.paramset_name, params: meta.params]
+        [key, meta, file]
+    }
     diff_normalised_matrix     = ch_differential_norm
     diff_variance_stabilised   = ch_differential_varstab
     diff_size_factors          = prepareModuleOutput(ABUNDANCE_DIFFERENTIAL_FILTER.out.size_factors, ch_paramsets)

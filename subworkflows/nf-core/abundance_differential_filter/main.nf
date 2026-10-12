@@ -235,6 +235,7 @@ workflow ABUNDANCE_DIFFERENTIAL_FILTER {
         .groupTuple()
 
     ch_dispersion_plot = DESEQ2_DIFFERENTIAL.out.dispersion_plot_png
+    
 
     ch_md_plot = LIMMA_DIFFERENTIAL.out.md_plot
 
